@@ -9,6 +9,24 @@ vector< string > split_line( string& line )
     return words;
 }
 
+inline int euclidean_distance( const pair<int, int>& a, const pair<int, int>& b)
+{
+    int dx = (a.first - b.first) * (a.first - b.first);
+    int dy = (a.second - b.second) * (a.second - b.second);
+    return (int) ceil( sqrt( dx + dy) );
+}
+
+void instance::initialize_adjacency_matrix()
+{
+    for(int i = 0; i < dimension; ++i)
+    {
+        for(int j = i + 1; j < dimension; ++j)
+        {
+            adjacency_matrix[i][j] = adjacency_matrix[j][i] = euclidean_distance(points[i], points[j]);
+        }
+    }
+}
+
 instance::instance( string _path_to_instance )
 {
     path_to_instance = _path_to_instance;
@@ -45,6 +63,8 @@ instance::instance( string _path_to_instance )
     }
 
     depot_index = stoi(file_lines[demand_start + dimension + 1][0]) - 1;
+    
+    initialize_adjacency_matrix();
 
 }
 

@@ -13,17 +13,18 @@
 
 using namespace std;
 
-vector< string > split_line( string& line );
-
 struct instance 
 {
     vector< pair<int, int> > points;
     vector<int> demands;
+    vector< vector<int> > adjacency_matrix;
 
     string path_to_instance;
     string instance_name;
 
     int dimension, depot_index, uniform_vehicle_capacity;
+    
+    void initialize_adjacency_matrix();
 
     instance( string _path_to_instance );
 
