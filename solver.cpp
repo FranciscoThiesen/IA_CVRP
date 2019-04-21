@@ -100,8 +100,8 @@ struct cvrp_instance {
 
 struct simulated_annealing {
     cvrp_instance instance;
-    vector<int> cur_routes;
-    map<int, int> cur_routes_data; // contains starting index and capacity
+    vector<int> cur_routes; // vector containing which node belongs to which routes (the end of the route is delimited by zero)
+    map<int, int> cur_routes_data; // contains starting index and capacity for every route
     int cur_route_cost;
     
     vector<int> best_routes;
@@ -138,6 +138,7 @@ struct simulated_annealing {
         cout << endl;
     }
     
+    // Fetches in log(n) time beginning and ending indexes for the route which englobes index idx
     pair<int, int> route_bounds(map<int, int> routes_data, int idx) {
         map<int, int>::iterator next_route_start = routes_data.lower_bound(idx);
         pair<int, int> bounds;
@@ -150,6 +151,7 @@ struct simulated_annealing {
         return bounds;
     }
     
+    // Given a lower and upper bound gets the route capacity in linear time
     int route_capacity_for_bounds(vector<int> routes, pair<int, int> bounds) {
         int capacity = 0;
         for (int i = bounds.first; i < bounds.second; i++) {
@@ -157,10 +159,11 @@ struct simulated_annealing {
         }
         return capacity;
     }
-    int route_capacity(vector<int> routes, map<int, int> routes_data, int idx) {
+    
+    // Returns total route capacity in log(n) time
+    int route_capacity(vector<int> prefix_sum_routes, map<int, int> routes_data, int idx) {
         pair<int, int> bounds = route_bounds(routes_data, idx);
-        
-        return route_capacity_for_bounds(routes, bounds);
+        return prefix_sum_routes[bounds.second];
     }
     
     int solution_cost(vector<int> routes) {
@@ -194,73 +197,95 @@ struct simulated_annealing {
                 }
             }
             cur_routes_data[start_index] = current_capacity;
-            start_index = cur_routes.size();
+            start_index = (int)cur_routes.size();
             cur_routes.emplace_back(instance.depot_index);
             total_routes++;
         }
     }
     
+    /**
+     * CVRP can be divided into:
+     * Allocation of customers (inter-route optimization)
+     * Optimization of the route itself (intra-route optimization)
+     */
     
     /**
-     * Transformation rules for generating neighbors
+     * Neighborhoods updates
      *
-     * - One to one exchange: randomly swap two nodes with each other
+     * - Exchange: randomly swap two nodes with each other
      * - Delete and insert: delete an arbitrary node and insert it to another position
-     * - Partial reversal: reverse visitation order in a part of a route
+     * - Reverse: reverse visitation order in a part of a route
      */
-    void update_solution(vector<int> *updated_routes, map<int, int> *updated_route_data) {
-        one_to_one_exchange(updated_routes, updated_route_data);
+    void update_solution(vector<int> &updated_routes, map<int, int> &updated_route_data) {
+        int type = rand() % 1;
+        switch(type) {
+            case 0:
+//                exchange(updated_routes, updated_route_data);
+//            case 1:
+                delete_and_insert(updated_routes, updated_route_data);
+//            case 2:
+//                reverse_route(updated_routes, updated_route_data);
+        }
+        
     }
     
+    
+    // EXCHANGE
     /**
      * Swaps the depot with a city. Creates a new route starting
-     * in the depot (where the city was) and updates the capacity
-     * of the route that is now a city (where the depot was)
+     * in the depot (where the city was - divides an existing route)
+     * and updates the capacity of the route that was extended
+     * (depot was substituted by a city)
      */
-    int swap_depot_city(vector<int> *updated_routes, map<int, int> *updated_routes_data, int idx_depot, int city_idx) {
-        cout << "merging and breaking" << endl;
-        vector<int> temp_routes(*updated_routes);
-        map<int, int> temp_route_data(*updated_routes_data);
-        swap_cities(&temp_routes, city_idx, idx_depot);
-        (temp_route_data).erase(idx_depot);
+    void swap_cities(vector<int> &updated_routes, int idx1, int idx2) {
+        int temp = updated_routes[idx1];
+        updated_routes[idx1] = updated_routes[idx2];
+        updated_routes[idx2] = temp;
+    }
+    
+    int swap_depot_city(vector<int> &updated_routes, map<int, int> &updated_routes_data, int idx_depot, int city_idx) {
+        int joined_route_start_idx = route_bounds(updated_routes_data, idx_depot-1).first;
+        int capacity_joined_route1 = updated_routes_data[joined_route_start_idx];
+        int capacity_joined_route2 = updated_routes_data[idx_depot];
+        int capacity_joined_route = capacity_joined_route1 + capacity_joined_route2 + instance.demands[city_idx];
         
-        int route1_start_idx = route_bounds(temp_route_data, city_idx).first;
-        int capacity_route1 = route_capacity(temp_routes, temp_route_data, idx_depot);
-        int capacity_route2 = route_capacity(temp_routes, temp_route_data, city_idx);
-        
-        // if swap doesn't violate capacity constraints update routes
-        if (capacity_route1 < instance.uniform_vehicle_capacity) {
-            swap_cities(updated_routes, city_idx, idx_depot);
-            (*updated_routes_data).erase(idx_depot);
+        // route1 was extended (depot was substituted by a city) and route 2
+        // was split (and therefore capacity constraints do not have to be checked)
+        if (capacity_joined_route < instance.uniform_vehicle_capacity) {
+            int city_route_start_idx = route_bounds(updated_routes_data, city_idx-1).first;
             
-            (*updated_routes_data)[route1_start_idx] = capacity_route1;
-            (*updated_routes_data)[city_idx] = capacity_route2;
+            swap_cities(updated_routes, city_idx, idx_depot);
+            // erase route starting at depot that was swapped for a city
+            updated_routes_data.erase(idx_depot);
+            // update joined route capacity
+            updated_routes_data[joined_route_start_idx] = capacity_joined_route;
+            
+            // the city substituted by a depot divided an existing route into two -
+            // the capacity of the previous route should be reduced by the capacity of
+            // the new divided route
+            int capacity_route2 = route_capacity(updated_routes, updated_routes_data, city_idx);
+            updated_routes_data[city_idx] = capacity_route2;
+            updated_routes_data[city_route_start_idx] -= capacity_route2;
             return 1;
         }
         
         return 0;
     }
     
-    void swap_cities(vector<int> *updated_routes, int idx1, int idx2) {
-        int temp = (*updated_routes)[idx1];
-        (*updated_routes)[idx1] = (*updated_routes)[idx2];
-        (*updated_routes)[idx2] = temp;
-    }
-    
-    void one_to_one_exchange(vector<int> *updated_routes, map<int, int> *updated_routes_data) {
+    void exchange(vector<int> &updated_routes, map<int, int> &updated_routes_data) {
         int did_exchange = 0;
         while (!did_exchange) {
             // randomly select two indexes to swap
-            int idx1 = rand() % updated_routes->size();
-            int idx2 = rand() % updated_routes->size();
+            int idx1 = rand() % (updated_routes.size() - 1);
+            int idx2 = rand() % (updated_routes.size() - 1);
             
             // find where the route containing the indexes start
-            int route1_start_idx = route_bounds(*updated_routes_data, idx1).first;
-            int route2_start_idx = route_bounds(*updated_routes_data, idx2).first;
+            pair<int, int> route1_bounds = route_bounds(updated_routes_data, idx1);
+            pair<int, int> route2_bounds = route_bounds(updated_routes_data, idx2);
             
             // find the cities in those indexes
-            int city_idx1 = (*updated_routes)[idx1];
-            int city_idx2 = (*updated_routes)[idx2];
+            int city_idx1 = updated_routes[idx1];
+            int city_idx2 = updated_routes[idx2];
             
             if (idx1 != idx2) { // randomly selected nodes are different
                 // vehicle routes are merged
@@ -271,22 +296,22 @@ struct simulated_annealing {
                     did_exchange = swap_depot_city(updated_routes, updated_routes_data, idx2, idx1);
                 }
                 // exchange within the same route - no need to check for capacity constraints
-                else if (route1_start_idx == route2_start_idx) {
-                    cout << "exchange within same route" << endl;
+                else if (route1_bounds.first == route2_bounds.first) {
                     swap_cities(updated_routes, idx1, idx2);
                     did_exchange = 1;
-                } else {
-                    int capacity_route1 = route_capacity(*updated_routes, *updated_routes_data, idx1);
-                    int capacity_route2 = route_capacity(*updated_routes, *updated_routes_data, idx2);
+                }
+                // exchange within different routes - need to check if capacity is exceeded
+                else {
+                    int capacity_route1 = updated_routes_data[route1_bounds.first];
+                    int capacity_route2 = updated_routes_data[route2_bounds.first];
                     
                     int updated_capacity_route1 = capacity_route1 - instance.demands[city_idx1] + instance.demands[city_idx2];
                     int updated_capacity_route2 = capacity_route2 - instance.demands[city_idx2] + instance.demands[city_idx1];
                     
                     if (updated_capacity_route1 < instance.uniform_vehicle_capacity &&
                         updated_capacity_route2 < instance.uniform_vehicle_capacity) {
-                        cout << "exchange within different routes" << endl;
-                        (*updated_routes_data)[route1_start_idx] = updated_capacity_route1;
-                        (*updated_routes_data)[route2_start_idx] = updated_capacity_route2;
+                        updated_routes_data[route1_bounds.first] = updated_capacity_route1;
+                        updated_routes_data[route2_bounds.first] = updated_capacity_route2;
                         swap_cities(updated_routes, idx1, idx2);
                         did_exchange = 1;
                     }
@@ -295,18 +320,167 @@ struct simulated_annealing {
         }
     }
     
+    
+    // DELETE AND INSERT
+    /**
+     * Moves a depot to a different position. Creates a new route starting
+     * in the insert position (divides an existing route) and joins adjacent
+     * routes that were divided by depot
+     */
+    int move_depot(vector<int> &updated_routes, map<int, int> &updated_routes_data, int idx_del, int idx_ins) {
+        int insert_route_start_idx = route_bounds(updated_routes_data, idx_ins).first;
+        int joined_route_start_idx = route_bounds(updated_routes_data, idx_del-1).first;
+        int capacity_joined_route;
+        if (insert_route_start_idx != joined_route_start_idx) {
+            capacity_joined_route = updated_routes_data[joined_route_start_idx] + updated_routes_data[idx_del];
+        } else {
+            
+        }
+        
+        // route1 was extended (depot was substituted by a city) and route 2
+        // was split (and therefore capacity constraints do not have to be checked)
+//        if (capacity_joined_route < instance.uniform_vehicle_capacity) {
+//            int city_route_start_idx = route_bounds(updated_routes_data, city_idx-1).first;
+//
+//            move(updated_routes, updated_routes_data, idx_del, idx_ins);
+//            // erase route starting at depot that was swapped for a city
+//            updated_routes_data.erase(idx_del);
+//            // update joined route capacity
+//            updated_routes_data[joined_route_start_idx] = capacity_joined_route;
+//
+//            // the capacity of the previous route should be reduced by the capacity of
+//            // the new divided route
+//            int capacity_route2 = route_capacity(updated_routes, updated_routes_data, city_idx);
+//            updated_routes_data[city_idx] = capacity_route2;
+//            updated_routes_data[city_route_start_idx] -= capacity_route2;
+//            return 1;
+//        }
+//
+        return 0;
+    }
+    
+    void move(vector<int> &updated_routes, map<int, int> &updated_routes_data, int idx_del, int idx_ins) {
+        int moved_city = updated_routes[idx_del];
+        
+        if (idx_ins < idx_del) { // shift right
+            for (int i = idx_ins + 1; i < idx_del; i++) {
+                updated_routes[i] = updated_routes[i-1];
+                if (updated_routes[i] == instance.depot_index) {
+                    // route capacity stays the same as before, but index is shifted
+                    updated_routes_data[i] = updated_routes_data[i-1];
+                    updated_routes_data.erase(i-1);
+                }
+            }
+        } else { // shift left
+            for (int i = idx_del; i < idx_ins; i++) {
+                updated_routes[i] = updated_routes[i+1];
+                if (updated_routes[i] == instance.depot_index) {
+                    // route capacity stays the same as before, but index is shifted
+                    updated_routes_data[i] = updated_routes_data[i+1];
+                    updated_routes_data.erase(i+1);
+                }
+            }
+        }
+        updated_routes[idx_ins] = moved_city;
+        
+        pair<int, int> route_del_bounds = route_bounds(updated_routes_data, idx_del);
+        pair<int, int> route_ins_bounds = route_bounds(updated_routes_data, idx_ins);
+        int capacity_route_ins = updated_routes_data[route_ins_bounds.first] + instance.demands[moved_city];
+        int capacity_route_del = updated_routes_data[route_del_bounds.first] - instance.demands[moved_city];
+        updated_routes_data[route_del_bounds.first] = capacity_route_del;
+        updated_routes_data[route_ins_bounds.first] = capacity_route_ins;
+    }
+    
+    void delete_and_insert(vector<int> &updated_routes, map<int, int> &updated_routes_data) {
+        int did_exchange = 0;
+        while (!did_exchange) {
+            // randomly select index to delete and idx to insert
+            int idx_del = rand() % (updated_routes.size() - 1);
+            int idx_insert = rand() % (updated_routes.size() - 1);
+            
+            pair<int, int> route_del_bounds = route_bounds(updated_routes_data, idx_del);
+            pair<int, int> route_ins_bounds = route_bounds(updated_routes_data, idx_insert);
+            
+            // find the cities in those indexes
+            int city_del = updated_routes[idx_del];
+            
+            if (idx_del != idx_insert) {
+                // vehicle routes are merged
+                if (city_del == instance.depot_index) {
+//                    did_exchange = move_depot(updated_routes, updated_routes_data, idx_del, idx_insert);
+                }
+                // delete and add within the same route - no need to check for capacity constraints
+                else if (route_del_bounds.first == route_ins_bounds.first) {
+                    move(updated_routes, updated_routes_data, idx_del, idx_insert);
+                    did_exchange = 1;
+                }
+                // add to different routes - need to check if capacity is exceeded
+                else {
+                    int capacity_route_ins = updated_routes_data[route_ins_bounds.first] + instance.demands[city_del];
+                    
+                    if (capacity_route_ins < instance.uniform_vehicle_capacity) {
+                        move(updated_routes, updated_routes_data, idx_del, idx_insert);
+                        did_exchange = 1;
+                    }
+                }
+            }
+        }
+    }
+    
+    // REVERSE
+    vector<int> reverse_aux(vector<int> route, int i, int k) {
+        vector<int> new_route(route);
+        
+        int it = 0;
+        while (it <= (k-i)/2) {
+            new_route[i+it] = route[k-it];
+            new_route[k-it] = route[i+it];
+            it++;
+        }
+        return new_route;
+    }
+    
+    void reverse_route(vector<int> &routes, map<int, int> route_data) {
+        int idx = (rand() % (cur_routes_data.size() - 1)) + 1;
+        pair<int, int> bounds = route_bounds(route_data, idx);
+        
+        vector<int> route;
+        route.assign(routes.begin() + bounds.first, routes.begin() + bounds.second);
+        
+        int route_size = bounds.second - bounds.first;
+        int best_distance = solution_cost(route);
+        
+        for (int i = 0; i < route_size - 1; i++) {
+            for (int k = i + 1; k < route_size; k++) {
+                vector<int> new_route = reverse_aux(route, i, k);
+                int new_distance = solution_cost(new_route);
+                if (new_distance < best_distance) {
+                    route = new_route;
+                }
+            }
+        }
+        
+        copy(route.begin(), route.end(), routes.begin() + bounds.first);
+    }
+    
+    /*
+    * Simulated Annealing
+    */
     int should_update(float cost_diff, float temp) {
         float prob = exp(-cost_diff / temp) * 100;
         return (rand() % 100 < prob);
     }
     
     vector<int> annealing_CVRP() {
-        float beta = 1.05; // iteration multiplier
-        float initial_temperature = 5000;
-        float temperature = initial_temperature;
+        const float initial_temperature = 5000;
         const float temp_factor = 0.99;  // temperature reduction multiplier
-        const float final_divisor = 50; // terminate iterations if temperature = initial_temp / final_divisor
         const float cutoff_time = 5; // iterations for a given temperature until the next update
+        const float max_time_improvement = 10000;
+        const float min_temp = 0.0001;
+        
+        int temp_time = 0;
+        int time_since_improvement = 0;
+        float temperature = initial_temperature;
         
         initial_solution_greedy();
         cur_route_cost = solution_cost(cur_routes);
@@ -314,14 +488,16 @@ struct simulated_annealing {
         best_routes = cur_routes;
         best_route_cost = solution_cost(best_routes);
         
-        while (temperature > 0.0001 || temperature) {
+        while (temperature > min_temp || time_since_improvement < max_time_improvement) {
+            time_since_improvement++;
             vector<int> updated_routes(cur_routes);
             map<int, int> updated_route_data(cur_routes_data);
             
-            update_solution(&updated_routes, &updated_route_data);
+            update_solution(updated_routes, updated_route_data);
             float new_cost = solution_cost(updated_routes);
             float cost_diff = new_cost - cur_route_cost;
             if (cost_diff < 0) { // update improved solution
+                time_since_improvement = 0;
                 cur_routes.assign(updated_routes.begin(), updated_routes.end());
                 
                 cout << "Cost updated: " << cur_route_cost << "-> " << new_cost << endl;
@@ -332,13 +508,17 @@ struct simulated_annealing {
                     best_route_cost = new_cost;
                 }
             }
-            else if (should_update(cost_diff, temperature)) {
+            else if (cost_diff != 0 && should_update(cost_diff, temperature)) {
                 cout << "Cost updated randomly: " << cur_route_cost << "-> " << new_cost << endl;
                 
                 cur_routes.assign(updated_routes.begin(), updated_routes.end());
                 cur_route_cost = new_cost;
             }
-            temperature *= temp_factor;
+            temp_time++;
+            if (temp_time == cutoff_time) {
+                temp_time = 0;
+                temperature *= temp_factor;
+            }
         }
         print_solution(best_routes);
         return best_routes;
@@ -349,7 +529,4 @@ int main()
 {
     cvrp_instance x("instances/X-n101-k25.vrp");
     simulated_annealing annealing(x);
-    
-    // Testing if load_instance is working as expected
-    // x.print_graph();
 }
