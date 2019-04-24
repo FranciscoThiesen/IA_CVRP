@@ -9,6 +9,8 @@
 #include <climits>
 #include "data_loader.h"
 
+#define TRACE(x) x
+
 using namespace std;
 
 inline int euclidean_distance( const pair<int, int>& a, const pair<int, int>& b)
@@ -22,19 +24,29 @@ struct grasp_solver
 {
     instance test_data;     
     pair<int, int> center;
-
+    
+    int worst_solver_ever()
+    {
+        int ans = 0;
+        for(int i = 0; i < test_data.dimension; ++i)
+        {
+            ans += (2 * euclidean_distance(test_data.points[i], center) );
+        }
+        return ans;
+    }
+    
     pair<int, vector< vector<int> > > smart_greedy()
     {
+
         vector< vector<int> > routes(1, vector<int>());
         vector< int > route_demand(1, 0);
-             
+        
         vector< tuple<int, int, int> > points;
         for(int p = 0; p < test_data.dimension; ++p)
         {
             if( p == test_data.depot_index ) continue;
             points.emplace_back( test_data.points[p].first, test_data.points[p].second, p );
         }
-        
 
         // Radial sort
         sort( points.begin(), points.end(), [&] (tuple<int, int, int>& a, tuple<int, int, int>& b)
@@ -55,6 +67,7 @@ struct grasp_solver
             return len_a < len_b;
         });
         
+
         int current_route = 0;
         // Lets try to create routes similar to "petals". We should check for demand feasibility for each route
         for(const auto& P : points) 
@@ -63,13 +76,13 @@ struct grasp_solver
             if( test_data.demands[point_index] + route_demand[current_route] <= test_data.uniform_vehicle_capacity )
             {
                 route_demand[current_route] += test_data.demands[point_index];
-                routes[current_route].emplace_back( point_index );
+                routes[current_route].push_back( point_index );
             }
             else
             {
                 current_route++;
                 route_demand[current_route] += test_data.demands[point_index];
-                routes.emplace_back( vector<int>(1, point_index) );
+                routes.push_back( vector<int>(1, point_index) );
             }
         }
        
@@ -78,11 +91,10 @@ struct grasp_solver
         {
             int route_length = (int) R.size();
             for(int idx = 1; idx < route_length; ++idx) total_route_cost += euclidean_distance( test_data.points[R[idx]], test_data.points[R[idx - 1]] );
-            total_route_cost += euclidean_distance( test_data.points[R[test_data.depot_index]], test_data.points[R[0]]);
-            total_route_cost += euclidean_distance( test_data.points[R[test_data.depot_index]], test_data.points[R.back()]);
-        
+            total_route_cost += euclidean_distance( test_data.points[test_data.depot_index], test_data.points[R[0]]);
+            total_route_cost += euclidean_distance( test_data.points[test_data.depot_index], test_data.points[R.back()]);
         }
-
+        
         return make_pair(total_route_cost, routes);
 
     }
@@ -100,5 +112,9 @@ struct grasp_solver
 
 int main()
 {
+    instance first_instance("instances/X-n101-k25.vrp");
+    grasp_solver solver(first_instance);
 
+    auto solution = solver.smart_greedy(); 
+    cout << solution.first << endl;
 }
