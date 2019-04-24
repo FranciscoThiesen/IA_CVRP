@@ -1,5 +1,7 @@
 #include "data_loader.h"
 
+constexpr int INF = 0x3f3f3f3f;
+
 vector< string > split_line( string& line )
 {
     stringstream sl(line);
@@ -18,6 +20,7 @@ inline int euclidean_distance( const pair<int, int>& a, const pair<int, int>& b)
 
 void instance::initialize_adjacency_matrix()
 {
+    adjacency_matrix.assign(dimension, vector<int>(dimension, INF) );
     for(int i = 0; i < dimension; ++i)
     {
         for(int j = i + 1; j < dimension; ++j)
@@ -40,13 +43,14 @@ instance::instance( string _path_to_instance )
         file_lines.emplace_back(x);
     }
     in.close();
+    
 
     instance_name = file_lines[0][2];
     dimension = stoi(file_lines[3][2]);
     uniform_vehicle_capacity = stoi( file_lines[5][2] );
 
     constexpr int graphdata_start = 7;
-
+        
     for(int node = 0; node < dimension; ++node)
     {
         int x = stoi( file_lines[graphdata_start + node][1] );
@@ -55,17 +59,15 @@ instance::instance( string _path_to_instance )
     }
 
     const int demand_start = graphdata_start + dimension + 1;
-
     for(int node = 0; node < dimension; ++node)
     {
         int demand = stoi( file_lines[demand_start + node][1] );
         demands.emplace_back( demand );
     }
-
+    
     depot_index = stoi(file_lines[demand_start + dimension + 1][0]) - 1;
     
     initialize_adjacency_matrix();
-
 }
 
 instance::instance() {}
