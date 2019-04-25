@@ -166,7 +166,6 @@ neighborhood_generator::neighborhood_generator() { }
 void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes, vector<int> &updated_route_capacities) {
     int type = rand() % 2;
     type = 1;
-    cout << "chamei a update solution com type = " << type << endl;
     switch(type) {
         case 0:
             exchange(updated_routes, updated_route_capacities, data_inst);

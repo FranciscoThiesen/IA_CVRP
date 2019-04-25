@@ -73,7 +73,7 @@ struct grasp_solver
         cur_routes_cost = solution_cost(cur_routes);
     }
 
-    void smart_greedy(int rotate_left)
+    void smart_greedy()
     {
         cur_routes.clear();
         cur_routes_capacities.clear();
@@ -100,8 +100,6 @@ struct grasp_solver
 
             return len_a < len_b;
         });
-        rotate_left %= test_data.dimension;
-        rotate( points.begin(), points.begin() + rotate_left, points.end() );
 
         int current_route = 0;
         for(const auto& P : points) 
@@ -137,10 +135,10 @@ struct grasp_solver
     
     // Pretendemos reportar todas as variacoes descritas acima
     
-    vector< vector<int> > grasp_solver_dumb_start(const int max_stall_iterations, int rotate_left)
+    vector< vector<int> > grasp_solver_dumb_start(const int max_stall_iterations) 
     {
         //worst_solver_ever();
-        smart_greedy(rotate_left);
+        smart_greedy();
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
         cout << (int) best_routes.size() << endl;
@@ -188,16 +186,7 @@ int main()
     vector< vector< int > > best_so_far;
     int cost_best_solve = 0x3f3f3f3f;
 
-    for(int i = 0; i < instance_dimension; ++i)
-    {
-        auto best_solution = solver.grasp_solver_dumb_start(100, i);
-        int cost = solver.solution_cost( best_solution );
-        if( cost < cost_best_solve ) 
-        {
-            cost_best_solve = cost;
-            best_so_far = best_solution;
-        }
-    }
+    auto best_solution = solver.grasp_solver_dumb_start(100);
     
     cout << cost_best_solve << endl;
 
