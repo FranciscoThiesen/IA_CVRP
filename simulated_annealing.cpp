@@ -33,7 +33,6 @@ struct simulated_annealing {
                 int visited_city = route[i];
                 cout << visited_city << " " << data_inst.points[visited_city].first << " " << data_inst.points[visited_city].second << " " << data_inst.demands[visited_city] << endl;
                 route_capacity += data_inst.demands[visited_city];
-                
                 if (visited_city == data_inst.depot_index) {
                     cout << "Route capacity: " << route_capacity << endl << endl;
                     route_capacity = 0;
@@ -50,7 +49,7 @@ struct simulated_annealing {
         cout << endl;
     }
   
-    int route_capacity(vector<vector<int>> routes, int route_idx) {
+    int route_capacity(vector<vector<int>>& routes, int route_idx) {
         vector<int> route = routes[route_idx];
         int capacity = 0;
         for (int i = 0; i < route.size(); i++) {
@@ -72,9 +71,8 @@ struct simulated_annealing {
     
     int solution_cost(vector<vector<int>> routes) {
         int cost = 0;
-        for (int r = 0; r < routes.size() - 1; r++) {
-            vector<int> route = routes[r];
-            cost += route_cost(route);
+        for (int r = 0; r < routes.size(); r++) {
+            cost += route_cost(route[r]);
         }
         return cost;
     }
@@ -136,7 +134,6 @@ struct simulated_annealing {
             time_since_improvement++;
             vector<vector<int>> updated_routes(cur_routes);
             vector<int> updated_route_capacities(cur_routes_capacities);
-            
             n_generator.update_solution(updated_routes, updated_route_capacities);
             float new_cost = solution_cost(updated_routes);
             float cost_diff = new_cost - cur_route_cost;
