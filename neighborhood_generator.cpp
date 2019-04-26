@@ -68,7 +68,7 @@ void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capac
     int moved_city = updated_routes[route_del][idx_del];
     
     updated_routes[route_del].erase(updated_routes[route_del].begin() + idx_del);
-    if (updated_routes[route_del].size() == 0) {
+    if (updated_routes[route_del].size() == 1) {
       updated_routes.erase(updated_routes.begin() + route_del);
       updated_routes_capacities.erase(updated_routes_capacities.begin() + route_del);
     }
@@ -168,8 +168,7 @@ neighborhood_generator::neighborhood_generator() { }
  * - Reverse: reverse visitation order in a part of a route
  */
 void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes, vector<int> &updated_route_capacities) {
-    int type = rand() % 2;
-    type = 1;
+    int type = 1;
     switch(type) {
         case 0:
             exchange(updated_routes, updated_route_capacities, data_inst);

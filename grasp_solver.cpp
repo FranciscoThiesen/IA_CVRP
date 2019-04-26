@@ -187,7 +187,7 @@ int main()
     int cost_best_solve = 0x3f3f3f3f;
 
     auto best_solution = solver.grasp_solver_dumb_start(100);
-    
+    cost_best_solve = solver.solution_cost( best_solution ); 
     cout << cost_best_solve << endl;
 
     return 0;
