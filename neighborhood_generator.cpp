@@ -68,6 +68,10 @@ void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capac
     int moved_city = updated_routes[route_del][idx_del];
     
     updated_routes[route_del].erase(updated_routes[route_del].begin() + idx_del);
+    if (updated_routes[route_del].size() == 0) {
+      updated_routes.erase(updated_routes.begin() + route_del);
+      updated_routes_capacities.erase(updated_routes_capacities.begin() + route_del);
+    }
     updated_routes[route_ins].insert(updated_routes[route_ins].begin() + idx_ins, moved_city);
     
     // capacities are not updated if both deleted and inserted are in same route
