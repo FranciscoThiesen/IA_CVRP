@@ -72,7 +72,7 @@ struct simulated_annealing {
     int solution_cost(vector<vector<int>> routes) {
         int cost = 0;
         for (int r = 0; r < routes.size(); r++) {
-            cost += route_cost(route[r]);
+            cost += route_cost(routes[r]);
         }
         return cost;
     }
@@ -167,7 +167,7 @@ struct simulated_annealing {
     
     void test_constants() {
         vector<float> initial_temperatures = {10000, 9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000, 500};
-        vector<float> temp_factors = {0.85, 0.9, 0.95};
+        vector<float> temp_factors = {0.9};
         float best_params_cost = 10e5;
         float best_temp, best_factor;
         for (int t = 0; t < initial_temperatures.size(); t++) {

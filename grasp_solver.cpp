@@ -7,6 +7,8 @@
 #include <map>
 #include <unordered_map>
 #include <climits>
+#include <random>
+#include <numeric>
 #include "data_loader.h"
 #include "neighborhood_generator.h"
 
@@ -134,23 +136,33 @@ struct grasp_solver
     */
     
     // Pretendemos reportar todas as variacoes descritas acima
-    
-    vector< vector<int> > grasp_solver_dumb_start(const int max_stall_iterations) 
+    void random_greedy( int seed ) 
     {
-        //worst_solver_ever();
-        smart_greedy();
+        deque<bool> visited( test_data.dimension, false );
+        vector<int> nodes( test_data.dimension, 0);
+        iota( nodes.begin(), nodes.end(), 0);
+
+    }
+
+
+    vector< vector<int> > cvrp_solver(const int max_stall_iterations, const int initial_solution_type, vector<int>& neighborhood_set ) 
+    {
+        if( initial_solution_type == 0 ) smart_greedy();
+        else worst_solver_ever();
+
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
-        cout << (int) best_routes.size() << endl;
         int cur_stall_iterations = 0;
         while(cur_stall_iterations < max_stall_iterations)
         {
             vector< vector<int> > updated_routes = cur_routes;
             vector<int> updated_routes_capacities = cur_routes_capacities;
-            n_generator.update_solution(updated_routes, updated_routes_capacities);
+            n_generator.update_solution_custom(updated_routes, updated_routes_capacities, neighborhood_set);
+            
             int new_cost = solution_cost(updated_routes);
-            int improvement = new_cost - cur_routes_cost;
-            if( improvement < 0 )
+            int improvement = cur_routes_cost - new_cost;
+            
+            if( improvement > 0 )
             {
                 cur_routes = updated_routes;
                 cur_routes_capacities = updated_routes_capacities;
@@ -185,9 +197,37 @@ int main()
     int instance_dimension = first_instance.dimension;
     vector< vector< int > > best_so_far;
     int cost_best_solve = 0x3f3f3f3f;
+    vector<int> best_neighborhood_combination;
+    int best_initial_solution_kind = -1;
 
-    auto best_solution = solver.grasp_solver_dumb_start(100);
-    cost_best_solve = solver.solution_cost( best_solution ); 
+    vector< vector<int> > n_sets;
+    n_sets.emplace_back(vector<int>{0});
+    n_sets.emplace_back(vector<int>{1});
+    n_sets.emplace_back(vector<int>{2});
+    n_sets.emplace_back(vector<int>{0,1});
+    n_sets.emplace_back(vector<int>{0,2});
+    n_sets.emplace_back(vector<int>{1,2});
+    n_sets.emplace_back(vector<int>{0,1,2});
+
+    for(int initial_solution_type = 0; initial_solution_type < 2; ++initial_solution_type)
+    {
+        for(auto& n_set : n_sets)
+        {
+            for(const auto& v : n_set) cout << v << " ";
+            auto solution = solver.cvrp_solver(100, initial_solution_type, n_set);
+            int s_cost = solver.solution_cost( solution );
+            if( s_cost < cost_best_solve) {
+                cost_best_solve = s_cost;
+                best_initial_solution_kind = initial_solution_type;
+                best_so_far = solution;
+                best_neighborhood_combination = n_set;
+            }
+        }
+    }
+    cout << "melhor resultado usa " << ( best_initial_solution_kind == 1 ? "smart_greedy" : "dummy_start" ) << endl;
+    cout << "melhor combinacao de vizinhancas = ";
+    for(const int& v : best_neighborhood_combination ) cout << v << " ";
+    cout << endl;
     cout << cost_best_solve << endl;
 
     return 0;

@@ -5,6 +5,17 @@
 #include "data_loader.h"
 #include "neighborhood_generator.h"
 
+using namespace std;
+
+#define show(a) cout << #a << endl;
+
+// Debugging functions
+void printVec( vector<int> v ) {
+    for(const int& x : v) cout << x << " ";
+    cout << endl;
+}
+
+
 int route_cost(vector<int> route, instance data_inst) {
     int cost = 0;
     for (int i = 0; i < route.size() - 1; i++) {
@@ -62,39 +73,41 @@ void exchange(vector<vector<int>> &updated_routes, vector<int> &updated_routes_c
     }
 }
 
-
 // DELETE AND INSERT
 void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst, int route_del, int route_ins, int idx_del, int idx_ins) {
     int moved_city = updated_routes[route_del][idx_del];
-    
+
     updated_routes[route_del].erase(updated_routes[route_del].begin() + idx_del);
-    if (updated_routes[route_del].size() == 1) {
-      updated_routes.erase(updated_routes.begin() + route_del);
-      updated_routes_capacities.erase(updated_routes_capacities.begin() + route_del);
-    }
     updated_routes[route_ins].insert(updated_routes[route_ins].begin() + idx_ins, moved_city);
     
     // capacities are not updated if both deleted and inserted are in same route
     if (route_del != route_ins) {
         int capacity_route_ins = updated_routes_capacities[route_ins] + data_inst.demands[moved_city];
         int capacity_route_del = updated_routes_capacities[route_del] - data_inst.demands[moved_city];
-        updated_routes_capacities[route_del] = capacity_route_del;
+        if (updated_routes[route_del].size() == 1) {
+          updated_routes.erase(updated_routes.begin() + route_del);
+          updated_routes_capacities.erase(updated_routes_capacities.begin() + route_del);
+        } else {
+            updated_routes_capacities[route_del] = capacity_route_del;
+        }
+        
         updated_routes_capacities[route_ins] = capacity_route_ins;
     }
 }
 
+
 void delete_and_insert(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
     int did_exchange = 0;
+    
     while (!did_exchange) {
         // randomly select index to delete and idx to insert - do not allow index 0
         int route_del = rand() % updated_routes.size();
         int route_ins = rand() % updated_routes.size();
         int idx_del = (rand() % (updated_routes[route_del].size() - 1)) + 1;
         int idx_ins = (rand() % (updated_routes[route_ins].size() - 1)) + 1;
-        
         // find the cities in those indexes
         int city_del = updated_routes[route_del][idx_del];
-        
+       
         if (route_del != route_ins || idx_del != idx_ins) {
             // delete and add within the same route - no need to check for capacity constraints
             if (route_del == route_ins) {
@@ -168,7 +181,7 @@ neighborhood_generator::neighborhood_generator() { }
  * - Reverse: reverse visitation order in a part of a route
  */
 void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes, vector<int> &updated_route_capacities) {
-    int type = 1;
+    int type = rand() % 3;
     switch(type) {
         case 0:
             exchange(updated_routes, updated_route_capacities, data_inst);
@@ -177,4 +190,14 @@ void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes
         case 2:
             reverse_route(updated_routes, updated_route_capacities, data_inst);
     }
+}
+
+void neighborhood_generator::update_solution_custom(vector< vector<int> >& updated_routes, vector<int>& updated_route_capacities, vector<int>& neighborhood_indices)
+{
+    int distinct_neighborhoods = (int) neighborhood_indices.size();
+    int gen = ( rand() % distinct_neighborhoods );
+    int v = neighborhood_indices[gen];
+    if( v == 0) exchange( updated_routes, updated_route_capacities, data_inst );
+    else if( v == 1 ) delete_and_insert( updated_routes, updated_route_capacities, data_inst);
+    else reverse_route( updated_routes, updated_route_capacities, data_inst);
 }
