@@ -84,14 +84,13 @@ void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capac
     if (route_del != route_ins) {
         int capacity_route_ins = updated_routes_capacities[route_ins] + data_inst.demands[moved_city];
         int capacity_route_del = updated_routes_capacities[route_del] - data_inst.demands[moved_city];
+        updated_routes_capacities[route_ins] = capacity_route_ins;        
         if (updated_routes[route_del].size() == 1) {
           updated_routes.erase(updated_routes.begin() + route_del);
           updated_routes_capacities.erase(updated_routes_capacities.begin() + route_del);
         } else {
             updated_routes_capacities[route_del] = capacity_route_del;
         }
-        
-        updated_routes_capacities[route_ins] = capacity_route_ins;
     }
 }
 
