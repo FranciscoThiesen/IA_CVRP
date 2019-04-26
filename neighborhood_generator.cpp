@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "data_loader.h"
 #include "neighborhood_generator.h"
+#include <random>
 
 using namespace std;
 
@@ -14,7 +15,6 @@ void printVec( vector<int> v ) {
     for(const int& x : v) cout << x << " ";
     cout << endl;
 }
-
 
 int route_cost(vector<int> route, instance data_inst) {
     int cost = 0;
@@ -189,6 +189,23 @@ void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes
         case 2:
             reverse_route(updated_routes, updated_route_capacities, data_inst);
     }
+}
+
+void neighborhood_generator::update_solution_deterministic(vector<vector<int>>& updated_routes, vector<int>& updated_route_capacities, int n_type) 
+{
+    switch(n_type) {
+        case 0:
+            exchange(updated_routes, updated_route_capacities, data_inst);
+        case 1:
+            delete_and_insert(updated_routes, updated_route_capacities, data_inst);
+        case 2:
+            reverse_route(updated_routes, updated_route_capacities, data_inst);
+    }
+}
+
+void neighborhood_generator::set_seed(int s) {
+    seed = s;
+    srand(seed);
 }
 
 void neighborhood_generator::update_solution_custom(vector< vector<int> >& updated_routes, vector<int>& updated_route_capacities, vector<int>& neighborhood_indices)
