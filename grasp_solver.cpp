@@ -74,7 +74,7 @@ struct grasp_solver
         cur_routes_cost = solution_cost(cur_routes);
     }
 
-    void smart_greedy(int seed)
+    void smart_greedy()
     {
         cur_routes.clear();
         cur_routes_capacities.clear();
@@ -102,7 +102,7 @@ struct grasp_solver
             return len_a < len_b;
         });
         
-        int rot = (seed % test_data.dimension);
+        int rot = ( rand() % test_data.dimension);
         
         rotate(points.begin(), points.begin() + rot, points.end() );
         int current_route = 0;
@@ -150,7 +150,7 @@ struct grasp_solver
     vector< vector<int> > cvrp_solver_first_improvement(const int max_stall_iterations, int initial_solution_type, vector<int>& neighborhood_set, int seed) 
     {
         if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy(0);
+        else smart_greedy();
 
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
@@ -185,7 +185,7 @@ struct grasp_solver
     vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int initial_solution_type, int seed) 
     {
         if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy(seed);
+        else smart_greedy();
 
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
@@ -262,16 +262,16 @@ int main()
     }*/
     
     srand(13);
-    constexpr int limit = 1000;
+    constexpr int limit = 50000;
     // Now let's for the the best_improvement_appoach
     // seed 13 - limit 50 - tol - 15 - 29 -> Result: 29164 
     // seed 13 - limit 900 - tol - 5  ( applying seed as rotation of petals ) -> 28644 
     // seed 13 - limit 1000 - tol - 5 -> result = 28904
+                    // 50000 - tol - 5 -> result 28348
     for(int iter = 0; iter < limit; ++iter) {
         int s = rand();
         auto solution = solver.cvrp_solver_best_improvement(5, 1, s);
         int s_cost = solver.solution_cost( solution );
-        cout << " custo = " << s_cost << endl;
         if( s_cost < cost_best_solve ) {
             cost_best_solve = s_cost;
             best_so_far = solution;
