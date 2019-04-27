@@ -110,7 +110,7 @@ bool apply_best_exchange(vector< vector<int> >& updated_routes, vector< int >& u
         swap_cities( updated_routes, best_first_route, best_second_route, best_first_index, best_second_index );
         return true;
     }
-    return false;
+    return true;
 }
 // DELETE AND INSERT
 void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst, int route_del, int route_ins, int idx_del, int idx_ins) {
@@ -213,7 +213,7 @@ bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector
             for(int delete_index = 1; delete_index < sz_del; ++delete_index) {
                 for(int insert_index = 1; insert_index < sz_ins; ++insert_index) {
                     if(updated_routes_capacities[insert_route] + data_inst.demands[ updated_routes[delete_route][delete_index] ] <= data_inst.uniform_vehicle_capacity ) {
-                        int cur_deleted = updated_routes[delete_route][delete_index - 1];
+                        int cur_deleted = updated_routes[delete_route][delete_index];
                         int prev_deleted = updated_routes[delete_route][delete_index - 1];
                         int next_deleted = ( delete_index == sz_del - 1 ? data_inst.depot_index : updated_routes[delete_route][delete_index + 1]);
                         int savings = data_inst.adjacency_matrix[ prev_deleted ][ cur_deleted ];
@@ -226,7 +226,7 @@ bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector
                         savings += data_inst.adjacency_matrix[prev_insert][next_insert];
                         savings -= data_inst.adjacency_matrix[prev_insert][cur_deleted];
                         savings -= data_inst.adjacency_matrix[cur_deleted][next_insert];
-                        
+                                 
                         if( savings > best_benefit )
                         {
                             best_benefit = savings;
@@ -248,7 +248,7 @@ bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector
             return true;
         }
     }
-    return true; // just to avoid warning
+    return false; // just to avoid warning
 }
 
 

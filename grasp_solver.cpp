@@ -74,7 +74,7 @@ struct grasp_solver
         cur_routes_cost = solution_cost(cur_routes);
     }
 
-    void smart_greedy()
+    void smart_greedy(int seed)
     {
         cur_routes.clear();
         cur_routes_capacities.clear();
@@ -101,7 +101,10 @@ struct grasp_solver
 
             return len_a < len_b;
         });
-
+        
+        int rot = (seed % test_data.dimension);
+        
+        rotate(points.begin(), points.begin() + rot, points.end() );
         int current_route = 0;
         for(const auto& P : points) 
         {
@@ -147,7 +150,7 @@ struct grasp_solver
     vector< vector<int> > cvrp_solver_first_improvement(const int max_stall_iterations, int initial_solution_type, vector<int>& neighborhood_set, int seed) 
     {
         if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy();
+        else smart_greedy(0);
 
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
@@ -182,7 +185,7 @@ struct grasp_solver
     vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int initial_solution_type, int seed) 
     {
         if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy();
+        else smart_greedy(seed);
 
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
@@ -228,7 +231,7 @@ int main()
     vector< vector< int > > best_so_far;
     int cost_best_solve = 0x3f3f3f3f;
     vector<int> best_neighborhood_combination;
-    int best_initial_solution_kind = -1;
+    int best_initial_solution_kind = 1;
 
     vector< vector<int> > n_sets;
     n_sets.emplace_back(vector<int>{0});
@@ -257,27 +260,26 @@ int main()
             }
         }
     }*/
-    constexpr int limit = 100;
-    // Now let's for the the best_improvement_appoach
+    
     srand(13);
-
+    constexpr int limit = 1000;
+    // Now let's for the the best_improvement_appoach
+    // seed 13 - limit 50 - tol - 15 - 29 -> Result: 29164 
+    // seed 13 - limit 900 - tol - 5  ( applying seed as rotation of petals ) -> 28644 
+    // seed 13 - limit 1000 - tol - 5 -> result = 28904
     for(int iter = 0; iter < limit; ++iter) {
         int s = rand();
-        for(int x = 0; x < 2; ++x)
-        {
-            auto solution = solver.cvrp_solver_best_improvement(10, x, s);
-            int s_cost = solver.solution_cost( solution );
-            if( s_cost < cost_best_solve ) {
-                cost_best_solve = s_cost;
-                best_initial_solution_kind = x;
-                best_so_far = solution;
-                best_neighborhood_combination = vector<int>{};
-            }
+        auto solution = solver.cvrp_solver_best_improvement(5, 1, s);
+        int s_cost = solver.solution_cost( solution );
+        cout << " custo = " << s_cost << endl;
+        if( s_cost < cost_best_solve ) {
+            cost_best_solve = s_cost;
+            best_so_far = solution;
         }
     }
     
     if( best_initial_solution_kind == 0 ) cout << "used dumb_start" << endl;
-    else if( best_initial_solution_kind == 1) cout << "used smart_greedy" << endl; 
+    else if( best_initial_solution_kind == 1 ) cout << "used smart_greedy" << endl; 
     cout << "melhor combinacao de vizinhancas = ";
     for(const int& v : best_neighborhood_combination ) cout << v << " ";
     cout << endl;
