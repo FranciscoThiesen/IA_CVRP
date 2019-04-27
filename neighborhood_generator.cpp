@@ -106,12 +106,11 @@ bool apply_best_exchange(vector< vector<int> >& updated_routes, vector< int >& u
         }
     }
     if( best_benefit <= 0) return false;
-    else {
-        swap_cities( updated_routes, best_first_route, best_second_route, best_first_index, best_second_index );
-        return true;
-    }
+    
+    swap_cities( updated_routes, best_first_route, best_second_route, best_first_index, best_second_index );
     return true;
 }
+
 // DELETE AND INSERT
 void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst, int route_del, int route_ins, int idx_del, int idx_ins) {
     int moved_city = updated_routes[route_del][idx_del];
@@ -132,7 +131,6 @@ void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capac
         }
     }
 }
-
 
 void delete_and_insert(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
     int did_exchange = 0;
@@ -163,38 +161,6 @@ void delete_and_insert(vector<vector<int>> &updated_routes, vector<int> &updated
             }
         }
     }
-}
-
-// REVERSE
-vector<int> reverse_aux(vector<int> route, int i, int k) {
-    vector<int> new_route(route);
-    int it = 0;
-    while (it <= (k-i)/2) {
-        new_route[i+it] = route[k-it];
-        new_route[k-it] = route[i+it];
-        it++;
-    }
-    return new_route;
-}
-
-void reverse_route(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
-    int idx = rand() % updated_routes.size();
-    
-    vector<int> route(updated_routes[idx]);
-
-    int best_distance = route_cost(route, data_inst);
-    
-    for (int i = 1; i < (int)route.size() - 1; i++) {
-        for (int k = i + 1; k < (int)route.size(); k++) {
-            vector<int> new_route = reverse_aux(route, i, k);
-            int new_distance = route_cost(new_route, data_inst);
-            if (new_distance < best_distance) {
-                route = new_route;
-            }
-        }
-    }
-    
-    updated_routes[idx] = route;
 }
 
 bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector<int>& updated_routes_capacities, instance data_inst)
@@ -243,15 +209,44 @@ bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector
     if( best_benefit <= 0) return false;
     else {
         if( best_deleted_route != best_inserted_route || best_deleted_index != best_inserted_index) {
-            if( best_deleted_route == best_inserted_route ) move(updated_routes, updated_routes_capacities, data_inst, best_deleted_route, best_inserted_route, best_deleted_index, best_inserted_index);
-            else move(updated_routes, updated_routes_capacities, data_inst, best_deleted_route, best_inserted_route, best_deleted_index, best_inserted_index);
+            move(updated_routes, updated_routes_capacities, data_inst, best_deleted_route, best_inserted_route, best_deleted_index, best_inserted_index);
             return true;
         }
     }
     return false; // just to avoid warning
 }
 
+// REVERSE
+vector<int> reverse_aux(vector<int> route, int i, int k) {
+    vector<int> new_route(route);
+    int it = 0;
+    while (it <= (k-i)/2) {
+        new_route[i+it] = route[k-it];
+        new_route[k-it] = route[i+it];
+        it++;
+    }
+    return new_route;
+}
 
+void reverse_route(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
+    int idx = rand() % updated_routes.size();
+    
+    vector<int> route(updated_routes[idx]);
+
+    int best_distance = route_cost(route, data_inst);
+    
+    for (int i = 1; i < (int)route.size() - 1; i++) {
+        for (int k = i + 1; k < (int)route.size(); k++) {
+            vector<int> new_route = reverse_aux(route, i, k);
+            int new_distance = route_cost(new_route, data_inst);
+            if (new_distance < best_distance) {
+                route = new_route;
+            }
+        }
+    }
+    
+    updated_routes[idx] = route;
+}
 
 neighborhood_generator::neighborhood_generator(instance inst) { 
   data_inst = inst;

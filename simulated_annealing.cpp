@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include "data_loader.h"
 #include "neighborhood_generator.h"
 
@@ -107,6 +108,59 @@ struct simulated_annealing {
         }
     }
     
+    void smart_greedy() {
+        cur_routes.clear();
+        cur_routes_capacities.clear();
+        
+        vector< vector<int> > routes(1, vector<int>(1, data_inst.depot_index));
+        vector< int > route_demand(1, 0);
+        vector< tuple<int, int, int> > points;
+        pair<int, int> center = data_inst.points[data_inst.depot_index];
+        for(int p = 0; p < data_inst.dimension; ++p)
+        {
+            if( p == data_inst.depot_index ) continue;
+            points.emplace_back( data_inst.points[p].first, data_inst.points[p].second, p );
+        }
+        // Radial sort
+        sort( points.begin(), points.end(), [&] (tuple<int, int, int>& a, tuple<int, int, int>& b)
+             {
+                 pair<int, int> pa = make_pair(get<0>(a) - center.first, get<1>(a) - center.second);
+                 pair<int, int> pb = make_pair(get<0>(b) - center.first, get<1>(b) - center.second);
+                 int cross_product = pa.first * pb.second - pa.second * pb.first;
+                 if( cross_product != 0 ) return (cross_product > 0);
+                 pa = make_pair(pa.first * pa.first, pa.second * pa.second );
+                 pb = make_pair(pb.first * pb.first, pb.second * pb.second );
+                 int len_a = pa.first + pa.second;
+                 int len_b = pb.first + pb.second;
+                 
+                 return len_a < len_b;
+             });
+        
+        int current_route = 0;
+        for(const auto& P : points)
+        {
+            int point_index = get<2>(P);
+            if( data_inst.demands[point_index] + route_demand[current_route] <= data_inst.uniform_vehicle_capacity )
+            {
+                route_demand[current_route] += data_inst.demands[point_index];
+                routes[current_route].push_back( point_index );
+            }
+            else
+            {
+                current_route++;
+                route_demand.push_back(0);
+                route_demand[current_route] += data_inst.demands[point_index];
+                routes.push_back( vector<int>(1, data_inst.depot_index) );
+                routes.back().push_back( point_index );
+                
+            }
+        }
+        
+        cur_routes = routes;
+        cur_routes_capacities = route_demand;
+        cur_route_cost = solution_cost(cur_routes);
+    }
+    
     /*
     * Simulated Annealing
     */
@@ -117,24 +171,23 @@ struct simulated_annealing {
     
     vector<vector<int>> annealing_CVRP(float initial_temperature, float temp_factor) {
         const float cutoff_time = 5; // iterations for a given temperature until the next update
-        const float max_time_improvement = 5000;
-        const float min_temp = 0.0001;
+        const float max_time_improvement = 10000;
         
         int temp_time = 0;
         int time_since_improvement = 0;
         float temperature = initial_temperature;
         
-        initial_solution_greedy();
+        smart_greedy();
         cur_route_cost = solution_cost(cur_routes);
         
         best_routes = cur_routes;
         best_route_cost = solution_cost(best_routes);
         
-        while (temperature > min_temp || time_since_improvement < max_time_improvement) {
+        while (time_since_improvement < max_time_improvement) {
             time_since_improvement++;
             vector<vector<int>> updated_routes(cur_routes);
             vector<int> updated_route_capacities(cur_routes_capacities);
-            n_generator.update_solution(updated_routes, updated_route_capacities);
+            n_generator.update_solution_best_improvement(updated_routes, updated_route_capacities);
             float new_cost = solution_cost(updated_routes);
             float cost_diff = new_cost - cur_route_cost;
             if (cost_diff < 0) { // update improved solution
@@ -142,15 +195,12 @@ struct simulated_annealing {
                 cur_routes = updated_routes;
                 cur_routes_capacities = updated_route_capacities;
                 cur_route_cost = new_cost;
-                cout << "Cost updated: " << cur_route_cost << "-> " << new_cost << endl;
                 if (new_cost < best_route_cost) {
                     best_routes.assign(updated_routes.begin(), updated_routes.end());
                     best_route_cost = new_cost;
                 }
             }
             else if (cost_diff != 0 && should_update(cost_diff, temperature)) {
-                cout << "Cost updated randomly: " << cur_route_cost << "-> " << new_cost << endl;
-                
                 cur_routes = updated_routes;
                 cur_routes_capacities = updated_route_capacities;
                 cur_route_cost = new_cost;
@@ -166,14 +216,15 @@ struct simulated_annealing {
     }
     
     void test_constants() {
-        vector<float> initial_temperatures = {10000, 9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000, 500};
-        vector<float> temp_factors = {0.9};
-        float best_params_cost = 10e5;
-        float best_temp, best_factor;
+        vector<int> initial_temperatures = {10000, 9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000, 500};
+        vector<float> temp_factors = {0.85, 0.9, 0.95};
+        int best_params_cost = 10e5;
+        int best_temp; float best_factor;
+        map<pair<int, float>, int> param_costs;
         for (int t = 0; t < initial_temperatures.size(); t++) {
             for (int f = 0; f < temp_factors.size(); f++) {
-                printf("initial temp: %.1f,  factor: %.2f", initial_temperatures[t], temp_factors[f]);
                 annealing_CVRP(initial_temperatures[t], temp_factors[f]);
+                param_costs[make_pair(initial_temperatures[t], temp_factors[f])] = best_route_cost;
                 if (best_route_cost < best_params_cost) {
                     best_params_cost = best_route_cost;
                     best_temp = initial_temperatures[t];
@@ -181,7 +232,11 @@ struct simulated_annealing {
                 }
             }
         }
-        printf("Best temp: %.2f, best factor: %.2f, best cost: %.2f\n", best_temp, best_factor, best_params_cost);
+        
+        for (const auto& params: param_costs) {
+            printf("Temp: %d, factor: %.2f, cost: %d\n", params.first.first, params.first.second, params.second);
+        }
+        printf("Best temp: %d, best factor: %.2f, best cost: %d\n", best_temp, best_factor, best_params_cost);
     }
     
     void check_routes_data(vector<vector<int>> routes, vector<int> route_capacities) {
@@ -199,6 +254,9 @@ struct simulated_annealing {
 
 int main()
 {
-    instance x("instances/X-n101-k25.vrp");
-    simulated_annealing annealing_CVRP(x);
+    vector<string> instances = {"instances/X-n101-k25.vrp", "instances/X-n110-k13.vrp", "instances/X-n115-k10.vrp"};
+    for (const string& file: instances) {
+      instance x(file);
+      simulated_annealing annealing_CVRP(x);
+    }
 }
