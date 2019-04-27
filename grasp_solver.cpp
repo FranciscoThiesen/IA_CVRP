@@ -35,7 +35,6 @@ struct grasp_solver
     
     vector< vector<int> > best_routes;
     int best_routes_cost;
-    
 
     int solution_cost(const vector< vector<int> >& routes)
     {
@@ -180,7 +179,7 @@ struct grasp_solver
         return best_routes;
     }
 
-    vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int initial_solution_type, vector<int>& neighborhood_set, int seed) 
+    vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int initial_solution_type, int seed) 
     {
         if( initial_solution_type == 0 ) worst_solver_ever();
         else smart_greedy();
@@ -193,36 +192,18 @@ struct grasp_solver
 
         while(cur_stall_iterations < max_stall_iterations)
         {
-            vector< vector<int> > best_R_routes = cur_routes;
-            vector<int> best_R_capacities = cur_routes_capacities;
-            int current_cost = solution_cost(cur_routes), best_R_cost = current_cost;
-            for(int n = 0; n < 3; ++n)
-            {
-                vector< vector<int> > updated_routes = cur_routes;
-                vector<int> updated_routes_capacities = cur_routes_capacities;
-                n_generator.update_solution_deterministic(updated_routes, updated_routes_capacities, n);
-                int new_cost = solution_cost( updated_routes );
-                
-                if( new_cost < best_R_cost )
-                {
-                    best_R_cost = new_cost;
-                    best_R_routes = updated_routes;
-                    best_R_capacities = updated_routes_capacities;
-                }
-            }
-
-            if( best_R_cost < current_cost )
-            {
-                cur_routes = best_R_routes;
-                cur_routes_capacities = best_R_capacities;
-                cur_routes_cost = best_R_cost;
+            vector< vector<int> > updated_routes = cur_routes;
+            vector<int> updated_routes_capacities = cur_routes_capacities;
+            bool has_improved = n_generator.update_solution_best_improvement(updated_routes, updated_routes_capacities);
+            if( has_improved ) {
+                best_routes = updated_routes;
+                best_routes_cost = solution_cost( best_routes );
                 cur_stall_iterations = 0;
-                best_routes = cur_routes;
-                best_routes_cost = cur_routes_cost;
-
+                cur_routes = best_routes;
+                cur_routes_capacities = updated_routes_capacities;
+                cur_routes_cost = best_routes_cost;
             }
-            else cur_stall_iterations++;
-            
+            else cur_stall_iterations++; 
         }
         return best_routes;
     }
@@ -244,7 +225,6 @@ int main()
 {
     instance first_instance("instances/X-n101-k25.vrp");
     grasp_solver solver(first_instance);
-    int instance_dimension = first_instance.dimension;
     vector< vector< int > > best_so_far;
     int cost_best_solve = 0x3f3f3f3f;
     vector<int> best_neighborhood_combination;
@@ -259,13 +239,15 @@ int main()
     n_sets.emplace_back(vector<int>{1,2});
     n_sets.emplace_back(vector<int>{0,1,2});
     
-    int S = time(NULL);
+    // int S = time(NULL);
+    // This is for testing first_improvement_approach  
+    /*
     for(int initial_solution_type = 0; initial_solution_type < 2; ++initial_solution_type)
     {
         for(auto& n_set : n_sets)
         {
             for(const auto& v : n_set) cout << v << " ";
-            auto solution = solver.cvrp_solver_best_improvement(10000, initial_solution_type, n_set, S);
+            auto solution = solver.cvrp_solver_first_improvement(100, initial_solution_type, n_set, S);
             int s_cost = solver.solution_cost( solution );
             if( s_cost < cost_best_solve) {
                 cost_best_solve = s_cost;
@@ -274,7 +256,26 @@ int main()
                 best_neighborhood_combination = n_set;
             }
         }
+    }*/
+    constexpr int limit = 100;
+    // Now let's for the the best_improvement_appoach
+    srand(13);
+
+    for(int iter = 0; iter < limit; ++iter) {
+        int s = rand();
+        for(int x = 0; x < 2; ++x)
+        {
+            auto solution = solver.cvrp_solver_best_improvement(10, x, s);
+            int s_cost = solver.solution_cost( solution );
+            if( s_cost < cost_best_solve ) {
+                cost_best_solve = s_cost;
+                best_initial_solution_kind = x;
+                best_so_far = solution;
+                best_neighborhood_combination = vector<int>{};
+            }
+        }
     }
+    
     if( best_initial_solution_kind == 0 ) cout << "used dumb_start" << endl;
     else if( best_initial_solution_kind == 1) cout << "used smart_greedy" << endl; 
     cout << "melhor combinacao de vizinhancas = ";

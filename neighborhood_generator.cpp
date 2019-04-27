@@ -8,17 +8,9 @@
 
 using namespace std;
 
-#define show(a) cout << #a << endl;
-
-// Debugging functions
-void printVec( vector<int> v ) {
-    for(const int& x : v) cout << x << " ";
-    cout << endl;
-}
-
 int route_cost(vector<int> route, instance data_inst) {
     int cost = 0;
-    for (int i = 0; i < route.size() - 1; i++) {
+    for (int i = 0; i < (int)route.size() - 1; i++) {
         int dist = data_inst.adjacency_matrix[route[i]][route[i+1]];
         cost += dist;
     }
@@ -73,6 +65,53 @@ void exchange(vector<vector<int>> &updated_routes, vector<int> &updated_routes_c
     }
 }
 
+bool apply_best_exchange(vector< vector<int> >& updated_routes, vector< int >& updated_route_capacities, instance data_inst)
+{
+    int total_routes = (int) updated_routes.size();
+    int best_benefit = -1;
+    int best_first_route = -1;
+    int best_first_index = -1;
+    int best_second_route = -1;
+    int best_second_index = -1;
+
+    for(int first_route = 0; first_route < total_routes; ++first_route) {
+        int fst_sz = (int) updated_routes[first_route].size();
+        for(int second_route = first_route; second_route < total_routes; ++second_route) {
+            int snd_sz = (int) updated_routes[second_route].size();
+            for(int first_index = 1; first_index < fst_sz; ++first_index) {
+                for(int second_index = 1; second_index < snd_sz; ++second_index) {
+                    int F = updated_routes[first_route][first_index];
+                    int S = updated_routes[second_route][second_index];
+                    int cap_fst = updated_route_capacities[first_route], cap_snd = updated_route_capacities[second_route];
+                    int upd_cap_fst = cap_fst - data_inst.demands[F] + data_inst.demands[S];
+                    int upd_cap_snd = cap_snd - data_inst.demands[S] + data_inst.demands[F];
+                    if ( max(upd_cap_fst, upd_cap_snd) <= data_inst.uniform_vehicle_capacity) {
+                        int prev_fst = updated_routes[first_route][first_index - 1];
+                        int next_fst = ( first_index == fst_sz - 1 ? data_inst.depot_index : updated_routes[first_route][first_index + 1] );
+                        int prev_snd = updated_routes[second_route][second_index - 1];
+                        int next_snd = ( second_index == snd_sz - 1? data_inst.depot_index : updated_routes[second_route][second_index + 1]);
+                        int gain = data_inst.adjacency_matrix[prev_fst][F] + data_inst.adjacency_matrix[F][next_fst];
+                        gain += data_inst.adjacency_matrix[prev_snd][S] + data_inst.adjacency_matrix[S][next_snd];
+                        gain -= ( data_inst.adjacency_matrix[prev_fst][S] + data_inst.adjacency_matrix[S][next_fst]);
+                        gain -= ( data_inst.adjacency_matrix[prev_snd][F] + data_inst.adjacency_matrix[F][next_snd]);
+
+                        if( gain > best_benefit ) {
+                            best_first_route = first_route; best_first_index = first_index;
+                            best_second_route = second_route; best_second_index = second_index; 
+                            best_benefit = gain;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if( best_benefit <= 0) return false;
+    else {
+        swap_cities( updated_routes, best_first_route, best_second_route, best_first_index, best_second_index );
+        return true;
+    }
+    return false;
+}
 // DELETE AND INSERT
 void move(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst, int route_del, int route_ins, int idx_del, int idx_ins) {
     int moved_city = updated_routes[route_del][idx_del];
@@ -129,7 +168,6 @@ void delete_and_insert(vector<vector<int>> &updated_routes, vector<int> &updated
 // REVERSE
 vector<int> reverse_aux(vector<int> route, int i, int k) {
     vector<int> new_route(route);
-    
     int it = 0;
     while (it <= (k-i)/2) {
         new_route[i+it] = route[k-it];
@@ -146,8 +184,8 @@ void reverse_route(vector<vector<int>> &updated_routes, vector<int> &updated_rou
 
     int best_distance = route_cost(route, data_inst);
     
-    for (int i = 1; i < route.size() - 1; i++) {
-        for (int k = i + 1; k < route.size(); k++) {
+    for (int i = 1; i < (int)route.size() - 1; i++) {
+        for (int k = i + 1; k < (int)route.size(); k++) {
             vector<int> new_route = reverse_aux(route, i, k);
             int new_distance = route_cost(new_route, data_inst);
             if (new_distance < best_distance) {
@@ -158,6 +196,62 @@ void reverse_route(vector<vector<int>> &updated_routes, vector<int> &updated_rou
     
     updated_routes[idx] = route;
 }
+
+bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector<int>& updated_routes_capacities, instance data_inst)
+{
+    // Remember that the first element from every route is the depot
+    int best_benefit = -1;
+    int best_deleted_route = -1;
+    int best_deleted_index = -1;
+    int best_inserted_route = -1;
+    int best_inserted_index = -1;
+    int total_routes = (int) updated_routes.size();
+    for(int delete_route = 0; delete_route < total_routes; ++delete_route) {
+        int sz_del = (int) updated_routes[delete_route].size();
+        for(int insert_route = 0; insert_route < total_routes; ++insert_route) {
+            int sz_ins = (int) updated_routes[insert_route].size();
+            for(int delete_index = 1; delete_index < sz_del; ++delete_index) {
+                for(int insert_index = 1; insert_index < sz_ins; ++insert_index) {
+                    if(updated_routes_capacities[insert_route] + data_inst.demands[ updated_routes[delete_route][delete_index] ] <= data_inst.uniform_vehicle_capacity ) {
+                        int cur_deleted = updated_routes[delete_route][delete_index - 1];
+                        int prev_deleted = updated_routes[delete_route][delete_index - 1];
+                        int next_deleted = ( delete_index == sz_del - 1 ? data_inst.depot_index : updated_routes[delete_route][delete_index + 1]);
+                        int savings = data_inst.adjacency_matrix[ prev_deleted ][ cur_deleted ];
+                        savings += data_inst.adjacency_matrix[ cur_deleted ][ next_deleted ];
+                        savings -= data_inst.adjacency_matrix[ prev_deleted ][ next_deleted ];
+
+                        int prev_insert = updated_routes[insert_route][insert_index - 1];
+                        int next_insert = updated_routes[insert_route][insert_index];
+
+                        savings += data_inst.adjacency_matrix[prev_insert][next_insert];
+                        savings -= data_inst.adjacency_matrix[prev_insert][cur_deleted];
+                        savings -= data_inst.adjacency_matrix[cur_deleted][next_insert];
+                        
+                        if( savings > best_benefit )
+                        {
+                            best_benefit = savings;
+                            best_deleted_route = delete_route;
+                            best_deleted_index = delete_index;
+                            best_inserted_route = insert_route;
+                            best_inserted_index = insert_index;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if( best_benefit <= 0) return false;
+    else {
+        if( best_deleted_route != best_inserted_route || best_deleted_index != best_inserted_index) {
+            if( best_deleted_route == best_inserted_route ) move(updated_routes, updated_routes_capacities, data_inst, best_deleted_route, best_inserted_route, best_deleted_index, best_inserted_index);
+            else move(updated_routes, updated_routes_capacities, data_inst, best_deleted_route, best_inserted_route, best_deleted_index, best_inserted_index);
+            return true;
+        }
+    }
+    return true; // just to avoid warning
+}
+
+
 
 neighborhood_generator::neighborhood_generator(instance inst) { 
   data_inst = inst;
@@ -191,6 +285,16 @@ void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes
     }
 }
 
+bool neighborhood_generator::update_solution_best_improvement( vector< vector<int> >& updated_routes, vector<int>& updated_route_capacities) {
+    int nei = rand() % 2;
+    if(nei == 0) {
+        return apply_best_exchange(updated_routes, updated_route_capacities, data_inst);    
+    }
+    else {
+        return apply_best_delete_and_insert(updated_routes, updated_route_capacities, data_inst);
+    }
+    return false;
+}
 void neighborhood_generator::update_solution_deterministic(vector<vector<int>>& updated_routes, vector<int>& updated_route_capacities, int n_type) 
 {
     switch(n_type) {
