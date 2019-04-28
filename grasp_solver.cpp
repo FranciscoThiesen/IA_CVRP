@@ -11,8 +11,12 @@
 #include <numeric>
 #include "data_loader.h"
 #include "neighborhood_generator.h"
+#include "time_lib.h"
+#include <fstream>
 
 #define TRACE(x) 
+
+constexpr int INF = 0x3f3f3f3f;
 
 using namespace std;
 
@@ -25,17 +29,18 @@ inline int euclidean_distance( const pair<int, int>& a, const pair<int, int>& b)
 
 struct grasp_solver
 {
-    instance test_data;     
-    pair<int, int> center;
-    int center_idx;
-    neighborhood_generator n_generator;
-    vector< vector<int> > cur_routes;
-    vector<int> cur_routes_capacities;
-    int cur_routes_cost; 
+    instance test_data; // Instancia que sera resolvida     
+    pair<int, int> center; // Posicao geografica do deposito
+    int center_idx; // Indice do deposito
+    neighborhood_generator n_generator; // gerador de vizinhanca para uma solucao 
+    vector< vector<int> > cur_routes; // routas da solucao atual
+    vector<int> cur_routes_capacities; // demandas sendo atentidadas em cada rota
+    int cur_routes_cost; // custo da solucao atual 
     
-    vector< vector<int> > best_routes;
+    vector< vector<int> > best_routes; 
     int best_routes_cost;
-
+    
+    // Funcao que calcula o custo total de uma solucao, uma rota de cada vez 
     int solution_cost(const vector< vector<int> >& routes)
     {
         int total_cost = 0;
@@ -55,25 +60,16 @@ struct grasp_solver
        
         return total_cost;
     }
-
-
-    void worst_solver_ever()
-    {
-        cur_routes.clear();
-        cur_routes_capacities.clear();
-
-        for(int i = 0; i < test_data.dimension; ++i)
-        {
-            if( i != center_idx )
-            {
-                cur_routes.emplace_back( vector<int>(1, center_idx) );
-                cur_routes.back().push_back(i);
-                cur_routes_capacities.emplace_back( test_data.demands[i] ); 
-            }
-        }
-        cur_routes_cost = solution_cost(cur_routes);
-    }
-
+    
+    /*
+     * A funcao smart_greedy foi chave na obtencao de solucoes proximas do OPT
+     * Nela realizamos os seguintes passos
+     * 1 - Ordenamos os pontos por suas coordenadas geograficas, ordenando em relacao ao angulo que cada ponto faz com o deposito
+     * 2 - Realizarmos um shift circular nesse vetor ordenado. ( via funcao de c++ rotate )
+     * 3 - Seguimos a ordem obtida, tentando sempre inserir o proximo elemento na ultima rota criada ate o momento. 
+     *     Se nao for possivel atender a esse elemento por questoes de capacidade dos caminhoes, iniciamos uma nova rota que contem
+     *     esse novo elemento.
+     */
     void smart_greedy()
     {
         cur_routes.clear();
@@ -104,8 +100,10 @@ struct grasp_solver
         
         int rot = ( rand() % test_data.dimension);
         
+        // Shift circular do vetor ordenado radialmente
         rotate(points.begin(), points.begin() + rot, points.end() );
         int current_route = 0;
+        
         for(const auto& P : points) 
         {
             int point_index = get<2>(P);
@@ -129,29 +127,15 @@ struct grasp_solver
         cur_routes_capacities = route_demand; 
         cur_routes_cost = solution_cost(cur_routes);
     }
-    
-    /* Testaremos varios tipos de solvers
-     * 1 - Best improvement
-     * 2 - Any improvement
-     * 3 - Greedy burro / Greedy "inteligente" randomizado
-     * 4 - Todas as combinacoes de vizinhanca possiveis
-    */
-    
-    // Pretendemos reportar todas as variacoes descritas acima
-    /*void random_greedy( int seed ) 
+   
+    /* Essa versao do solver obedece a politica de first_improvement. 
+     * Como essa versao obteve resultados estritamente piores nas instancias, vamos nos limitar
+     * a analisar a versao que segue a politiva de best_improvement
+     */
+
+    vector< vector<int> > cvrp_solver_first_improvement(const int max_stall_iterations, vector<int>& neighborhood_set, int seed) 
     {
-        deque<bool> visited( test_data.dimension, false );
-        vector<int> nodes( test_data.dimension, 0);
-        iota( nodes.begin(), nodes.end(), 0);
-
-    }*/
-
-
-    vector< vector<int> > cvrp_solver_first_improvement(const int max_stall_iterations, int initial_solution_type, vector<int>& neighborhood_set, int seed) 
-    {
-        if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy();
-
+        smart_greedy();
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
         int cur_stall_iterations = 0;
@@ -182,11 +166,18 @@ struct grasp_solver
         return best_routes;
     }
 
-    vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int initial_solution_type, int seed) 
-    {
-        if( initial_solution_type == 0 ) worst_solver_ever();
-        else smart_greedy();
+    /* Essa versao do solver foi que obteve os melhores resultados.
+     * Passos:
+     * 1 - Gerar solucao inicial via smart_greedy
+     * 2 - A cada step, selecionamos de forma equiprovável uma das seguintes vizinhancas ( delete_and_insert e exchange )
+     * 3 - Buscamos o melhor vizinho da vizinhanca escolhida no passo 2.
+     * 4 - Se esse vizinho é estritamente melhor que a solucao atual, atribuímos ele a nossa solução inicial
+     * 5 - Se apos, max_stall_iterations nao obtivemos melhora a melhor solucao. Retornamos a melhor solucao encontrada
+     */
 
+    vector< vector<int> > cvrp_solver_best_improvement(const int max_stall_iterations, int seed) 
+    {
+        smart_greedy();
         best_routes = cur_routes;
         best_routes_cost = cur_routes_cost;
         int cur_stall_iterations = 0;
@@ -224,66 +215,62 @@ struct grasp_solver
 
 };
 
-int main()
+// Funcao que chama o solver com parametros definidos
+int generate_solution( string instance_name, int allowed_iterations )
 {
-    instance first_instance("instances/X-n101-k25.vrp");
-    grasp_solver solver(first_instance);
-    vector< vector< int > > best_so_far;
-    int cost_best_solve = 0x3f3f3f3f;
-    vector<int> best_neighborhood_combination;
-    int best_initial_solution_kind = 1;
-
-    vector< vector<int> > n_sets;
-    n_sets.emplace_back(vector<int>{0});
-    n_sets.emplace_back(vector<int>{1});
-    n_sets.emplace_back(vector<int>{2});
-    n_sets.emplace_back(vector<int>{0,1});
-    n_sets.emplace_back(vector<int>{0,2});
-    n_sets.emplace_back(vector<int>{1,2});
-    n_sets.emplace_back(vector<int>{0,1,2});
+    grasp_solver solver( instance_name );
+    int best_cost = INF;
+    vector< vector<int> > best_solution_found;
     
-    // int S = time(NULL);
-    // This is for testing first_improvement_approach  
-    /*
-    for(int initial_solution_type = 0; initial_solution_type < 2; ++initial_solution_type)
+    srand(13); // Lucky seed (:
+    
+    for(int i = 0; i < allowed_iterations; ++i)
     {
-        for(auto& n_set : n_sets)
-        {
-            for(const auto& v : n_set) cout << v << " ";
-            auto solution = solver.cvrp_solver_first_improvement(100, initial_solution_type, n_set, S);
-            int s_cost = solver.solution_cost( solution );
-            if( s_cost < cost_best_solve) {
-                cost_best_solve = s_cost;
-                best_initial_solution_kind = initial_solution_type;
-                best_so_far = solution;
-                best_neighborhood_combination = n_set;
-            }
-        }
-    }*/
-    
-    srand(13);
-    constexpr int limit = 50000;
-    // Now let's for the the best_improvement_appoach
-    // seed 13 - limit 50 - tol - 15 - 29 -> Result: 29164 
-    // seed 13 - limit 900 - tol - 5  ( applying seed as rotation of petals ) -> 28644 
-    // seed 13 - limit 1000 - tol - 5 -> result = 28904
-                    // 50000 - tol - 5 -> result 28348
-    for(int iter = 0; iter < limit; ++iter) {
         int s = rand();
-        auto solution = solver.cvrp_solver_best_improvement(5, 1, s);
-        int s_cost = solver.solution_cost( solution );
-        if( s_cost < cost_best_solve ) {
-            cost_best_solve = s_cost;
-            best_so_far = solution;
+        auto solution = solver.cvrp_solver_best_improvement(10, s);
+        int solution_cost = solver.solution_cost( solution );
+        if( solution_cost < best_cost ) 
+        {
+            best_cost = solution_cost;
+            best_solution_found = solution;
         }
     }
+    return best_cost;
+}
+
+
+int main()
+{
     
-    if( best_initial_solution_kind == 0 ) cout << "used dumb_start" << endl;
-    else if( best_initial_solution_kind == 1 ) cout << "used smart_greedy" << endl; 
-    cout << "melhor combinacao de vizinhancas = ";
-    for(const int& v : best_neighborhood_combination ) cout << v << " ";
-    cout << endl;
-    cout << cost_best_solve << endl;
+    instance first_instance("instances/X-n204-k19.vrp");
+    string instance_prefix = "instances/";
+    string csv_prefix = "results/";
+    vector< string > instances = { "X-n101-k25.vrp", "X-n110-k13.vrp", "X-n115-k10.vrp", "X-n204-k19.vrp" };
+    vector< string > csv_names = { "X-n101-k25.csv", "X-n110-k13.csv", "X-n115-k10.csv", "X-n204-k19.csv" };
+    vector< int > bks = { 27591, 14971, 12747, 19565 };
+    vector< int > iterations = { 5, 10, 50, 100, 500, 1000, 10000 };
+    
+    constexpr int total_instances = 4;
+    
+    for(int i = 0; i < total_instances; ++i) 
+    {
+        string instance_name = instance_prefix + instances[i];
+        string file_name = csv_prefix + csv_names[i];
+        ofstream out_file(file_name);
+        cout << "Rodando para a imagem " << instances[i] << endl;
+        out_file << "Total iteracoes,Tempo total(ms),Solucao encontrada,BKS,Approximation Ratio" << endl;
+        for(const int iter : iterations )
+        {
+            cout << "rodando para uma quantidade de iteracoes = " << iter << endl;
+            clock_t start = get_time();
+            int solution_cost = generate_solution( instance_name, iter );
+            clock_t end   = get_time();
+            long double duration = time_in_ms(start, end);
+            out_file << iter << "," << duration << "," << solution_cost << "," << bks[i] << "," << (1.0 * solution_cost / bks[i] ) << endl; 
+        }
+        out_file.close();
+    }
+    
 
     return 0;
 }

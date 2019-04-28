@@ -1,0 +1,15 @@
+Para reproduzir os resultados reportados no relatório, basta seguir os seguintes passos.
+
+Simulated-Annealing
+1 - Entre na pasta do Projeto
+2 - Rode o comando no terminal "make -f makefile_simulated_annealing "
+3 - Rode o executável gerado, chamado SIMULATED_ANNEALING_SOLVER, 
+    digitando no terminal "./SIMULATED_ANNEALING_SOLVER"
+
+GRASP
+1 - Entre na pasta do projeto
+2 - Rode o comando no terminal "make -f makefile_grasp"
+3 - Rode o executável gerado, chamado GRASP_SOLVER,
+    digitando no terminal "./GRASP_SOLVER"
+
+

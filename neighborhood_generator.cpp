@@ -290,6 +290,7 @@ bool neighborhood_generator::update_solution_best_improvement( vector< vector<in
     }
     return false;
 }
+
 void neighborhood_generator::update_solution_deterministic(vector<vector<int>>& updated_routes, vector<int>& updated_route_capacities, int n_type) 
 {
     switch(n_type) {

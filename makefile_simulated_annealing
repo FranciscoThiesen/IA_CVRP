@@ -1,0 +1,26 @@
+OBJS	= simulated_annealing.o neighborhood_generator.o data_loader.o time_lib.o
+SOURCE	= simulated_annealing.cpp neighborhood_generator.cpp data_loader.cpp time_lib.cpp
+HEADER	= neighborhood_generator.h data_loader.h time_lib.h
+OUT	= SIMULATED_ANNEALING_SOLVER
+CC	 = g++
+FLAGS	 = -g -c
+LFLAGS	 = 
+
+all: $(OBJS)
+	$(CC) -g $(OBJS) -o $(OUT) $(LFLAGS)
+
+simmulated_annealing.o: simulated_annealing.cpp
+	$(CC) $(FLAGS) simmulated_annealing.cpp -std=c++14
+
+neighborhood_generator.o: neighborhood_generator.cpp
+	$(CC) $(FLAGS) neighborhood_generator.cpp -std=c++14
+
+data_loader.o: data_loader.cpp
+	$(CC) $(FLAGS) data_loader.cpp -std=c++14
+
+time_lib.o: time_lib.cpp
+	$(CC) $(FLAGS) time_lib.cpp -std=c++14
+
+
+clean:
+	rm -f $(OBJS) $(OUT)
