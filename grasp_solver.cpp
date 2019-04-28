@@ -244,7 +244,7 @@ int main()
     
     instance first_instance("instances/X-n204-k19.vrp");
     string instance_prefix = "instances/";
-    string csv_prefix = "results/";
+    string csv_prefix = "grasp_results/";
     vector< string > instances = { "X-n101-k25.vrp", "X-n110-k13.vrp", "X-n115-k10.vrp", "X-n204-k19.vrp" };
     vector< string > csv_names = { "X-n101-k25.csv", "X-n110-k13.csv", "X-n115-k10.csv", "X-n204-k19.csv" };
     vector< int > bks = { 27591, 14971, 12747, 19565 };
