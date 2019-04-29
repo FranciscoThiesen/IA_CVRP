@@ -224,10 +224,9 @@ struct simulated_annealing {
         map<pair<int, float>, pair<int, long double> > param_costs;
         string csv_name = data_inst.instance_name;
         int instance_BKS = 0;
-         
-        if( csv_name == "X-101-k25" ) instance_BKS = 27591;
-        else if( csv_name == "X-110-k13") instance_BKS = 14971;
-        else if( csv_name == "X-115-k10") instance_BKS = 12747;
+        if( csv_name == "X-n101-k25" ) instance_BKS = 27591;
+        else if( csv_name == "X-n110-k13") instance_BKS = 14971;
+        else if( csv_name == "X-n115-k10") instance_BKS = 12747;
         else instance_BKS = 19565;
         cout << "BKS = " << instance_BKS << endl;
         csv_name += ".csv"; 
