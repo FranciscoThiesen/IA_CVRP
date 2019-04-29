@@ -5,6 +5,7 @@
 #include <map>
 #include "data_loader.h"
 #include "neighborhood_generator.h"
+#include "time_lib.h"
 
 struct simulated_annealing {
     instance data_inst;
@@ -28,9 +29,9 @@ struct simulated_annealing {
     void print_solution(vector<vector<int>> routes) {
         int route_capacity = 0;
         cout << "Route" << endl;
-        for (int r = 0; r < routes.size(); r++) {
+        for (int r = 0; r < (int) routes.size(); r++) {
             vector<int> route = routes[r];
-            for (int i = 0; i < route.size(); i++ ) {
+            for (int i = 0; i < (int) route.size(); i++ ) {
                 int visited_city = route[i];
                 cout << visited_city << " " << data_inst.points[visited_city].first << " " << data_inst.points[visited_city].second << " " << data_inst.demands[visited_city] << endl;
                 route_capacity += data_inst.demands[visited_city];
@@ -44,7 +45,7 @@ struct simulated_annealing {
     }
     
     void print_vec(vector<int > v) {
-        for (int i = 0; i < v.size(); i++) {
+        for (int i = 0; i < (int) v.size(); i++) {
             cout << v[i] << ", ";
         }
         cout << endl;
@@ -53,7 +54,7 @@ struct simulated_annealing {
     int route_capacity(vector<vector<int>>& routes, int route_idx) {
         vector<int> route = routes[route_idx];
         int capacity = 0;
-        for (int i = 0; i < route.size(); i++) {
+        for (int i = 0; i < (int) route.size(); i++) {
             capacity += data_inst.demands[route[i]];
         }
         return capacity;
@@ -61,7 +62,7 @@ struct simulated_annealing {
     
     int route_cost(vector<int> route) {
         int cost = 0;
-        for (int i = 0; i < route.size() - 1; i++) {
+        for (int i = 0; i < (int) route.size() - 1; i++) {
             int dist = data_inst.adjacency_matrix[route[i]][route[i+1]];
             cost += dist;
         }
@@ -72,7 +73,7 @@ struct simulated_annealing {
     
     int solution_cost(vector<vector<int>> routes) {
         int cost = 0;
-        for (int r = 0; r < routes.size(); r++) {
+        for (int r = 0; r < (int) routes.size(); r++) {
             cost += route_cost(routes[r]);
         }
         return cost;
@@ -187,7 +188,7 @@ struct simulated_annealing {
             time_since_improvement++;
             vector<vector<int>> updated_routes(cur_routes);
             vector<int> updated_route_capacities(cur_routes_capacities);
-            n_generator.update_solution_best_improvement(updated_routes, updated_route_capacities);
+            n_generator.update_solution(updated_routes, updated_route_capacities);
             float new_cost = solution_cost(updated_routes);
             float cost_diff = new_cost - cur_route_cost;
             if (cost_diff < 0) { // update improved solution
@@ -219,30 +220,46 @@ struct simulated_annealing {
         vector<int> initial_temperatures = {10000, 9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000, 500};
         vector<float> temp_factors = {0.85, 0.9, 0.95};
         int best_params_cost = 10e5;
-        int best_temp; float best_factor;
-        map<pair<int, float>, int> param_costs;
-        for (int t = 0; t < initial_temperatures.size(); t++) {
-            for (int f = 0; f < temp_factors.size(); f++) {
+        //int best_temp; float best_factor;
+        map<pair<int, float>, pair<int, long double> > param_costs;
+        string csv_name = data_inst.instance_name;
+        int instance_BKS = 0;
+         
+        if( csv_name == "X-101-k25" ) instance_BKS = 27591;
+        else if( csv_name == "X-110-k13") instance_BKS = 14971;
+        else if( csv_name == "X-115-k10") instance_BKS = 12747;
+        else instance_BKS = 19565;
+        cout << "BKS = " << instance_BKS << endl;
+        csv_name += ".csv"; 
+        csv_name = "simulated_annealing_results/" + csv_name; 
+        ofstream out(csv_name);
+        for (int t = 0; t < (int) initial_temperatures.size(); t++) {
+            for (int f = 0; f < (int) temp_factors.size(); f++) {
+                cout << "rodando t = " << t << " f = " << f << endl;
+                clock_t start = get_time();
                 annealing_CVRP(initial_temperatures[t], temp_factors[f]);
-                param_costs[make_pair(initial_temperatures[t], temp_factors[f])] = best_route_cost;
+                clock_t end = get_time();
+                long double duration = time_in_ms(start, end); 
+                param_costs[make_pair(initial_temperatures[t], temp_factors[f])] = make_pair(best_route_cost, duration);
                 if (best_route_cost < best_params_cost) {
                     best_params_cost = best_route_cost;
-                    best_temp = initial_temperatures[t];
-                    best_factor = temp_factors[f];
+                    //best_temp = initial_temperatures[t];
+                    //best_factor = temp_factors[f];
                 }
             }
         }
         
-        for (const auto& params: param_costs) {
-            printf("Temp: %d, factor: %.2f, cost: %d\n", params.first.first, params.first.second, params.second);
+        out << "Temperatura inicial,Fator de temperatura,Tempo (ms),Solucao,BKS,Approximation Ratio" << endl;
+        for(const auto& entry : param_costs) {
+            out << entry.first.first << "," << entry.first.second << "," << entry.second.second << "," << entry.second.first << "," << instance_BKS << "," << 1.0 * entry.second.first / instance_BKS << endl;
         }
-        printf("Best temp: %d, best factor: %.2f, best cost: %d\n", best_temp, best_factor, best_params_cost);
+        out.close();
     }
     
     void check_routes_data(vector<vector<int>> routes, vector<int> route_capacities) {
-        for (int r = 0; r < routes.size(); r++) {
+        for (int r = 0; r < (int) routes.size(); r++) {
             int capacity = 0;
-            for (int i = 0; i < routes[r].size(); i++) {
+            for (int i = 0; i < (int) routes[r].size(); i++) {
                 capacity += data_inst.demands[routes[r][i]];
             }
             if (route_capacities[r] != capacity) {
@@ -253,10 +270,10 @@ struct simulated_annealing {
 };
 
 int main()
-{
-    vector<string> instances = {"instances/X-n101-k25.vrp", "instances/X-n110-k13.vrp", "instances/X-n115-k10.vrp"};
-    for (const string& file: instances) {
-      instance x(file);
-      simulated_annealing annealing_CVRP(x);
-    }
+    {
+        vector<string> instances = {"instances/X-n101-k25.vrp", "instances/X-n110-k13.vrp", "instances/X-n115-k10.vrp", "instances/X-n204-k19.vrp"};
+        for (const string& file: instances) {
+          instance x(file);
+          simulated_annealing annealing_CVRP(x);
+        }
 }
