@@ -216,32 +216,30 @@ bool apply_best_delete_and_insert( vector< vector<int> >& updated_routes, vector
     return false; // just to avoid warning
 }
 
-// REVERSE
-vector<int> reverse_aux(vector<int> route, int i, int k) {
-    vector<int> new_route(route);
-    int it = 0;
-    while (it <= (k-i)/2) {
-        new_route[i+it] = route[k-it];
-        new_route[k-it] = route[i+it];
-        it++;
-    }
-    return new_route;
-}
-
-void reverse_route(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
+// 2-OPT
+/*
+j+1 i+1 -           j+1 <-- i+1 <-
+ ^  ^    |                        |
+  \/     |                        |
+  /\     |                        |
+ i  j <--              i --> j ---
+*/
+void two_opt(vector<vector<int>> &updated_routes, vector<int> &updated_routes_capacities, instance data_inst) {
     int idx = rand() % updated_routes.size();
     
     vector<int> route(updated_routes[idx]);
 
     int best_distance = route_cost(route, data_inst);
     
-    for (int i = 1; i < (int)route.size() - 1; i++) {
-        for (int k = i + 1; k < (int)route.size(); k++) {
-            vector<int> new_route = reverse_aux(route, i, k);
-            int new_distance = route_cost(new_route, data_inst);
-            if (new_distance < best_distance) {
-                route = new_route;
-            }
+    for (int i = 1; i < (int)route.size() - 2; i++) {
+        vector<int> new_route(route);
+        int j = i + 2;
+        int temp = new_route[i+1];
+        new_route[i+1] = route[j]; // vizinho de i vira j
+        new_route[j] = temp; // j é antigo vizinho de i
+        int new_distance = route_cost(new_route, data_inst);
+        if (new_distance < best_distance) {
+            route = new_route;
         }
     }
     
@@ -276,7 +274,7 @@ void neighborhood_generator::update_solution(vector<vector<int>> &updated_routes
         case 1:
             delete_and_insert(updated_routes, updated_route_capacities, data_inst);
         case 2:
-            reverse_route(updated_routes, updated_route_capacities, data_inst);
+            two_opt(updated_routes, updated_route_capacities, data_inst);
     }
 }
 
@@ -299,7 +297,7 @@ void neighborhood_generator::update_solution_deterministic(vector<vector<int>>& 
         case 1:
             delete_and_insert(updated_routes, updated_route_capacities, data_inst);
         case 2:
-            reverse_route(updated_routes, updated_route_capacities, data_inst);
+            two_opt(updated_routes, updated_route_capacities, data_inst);
     }
 }
 
@@ -315,5 +313,5 @@ void neighborhood_generator::update_solution_custom(vector< vector<int> >& updat
     int v = neighborhood_indices[gen];
     if( v == 0) exchange( updated_routes, updated_route_capacities, data_inst );
     else if( v == 1 ) delete_and_insert( updated_routes, updated_route_capacities, data_inst);
-    else reverse_route( updated_routes, updated_route_capacities, data_inst);
+    else two_opt( updated_routes, updated_route_capacities, data_inst);
 }
